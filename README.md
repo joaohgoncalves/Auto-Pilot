@@ -134,9 +134,11 @@ Production compose is separated from development and keeps Postgres/Redis off pu
 docker compose -f infra/docker-compose.prod.yml --env-file .env.production up --build -d
 ```
 
-## Important simulation note
+## External integrations
 
-External integrations are intentionally simulated. Notifications, recovery checks and rollback actions are written as audit records and `NotificationDelivery` rows. No real deployment system, webhook provider or ERP is called by this starter.
+External integrations are partially supported through the generic webhook action provider. Configure `WEBHOOK_PROVIDER_URL`, `WEBHOOK_PROVIDER_TIMEOUT_MS` and optional `WEBHOOK_PROVIDER_TOKEN`, or provide `provider: "webhook"` and `webhookUrl` in an action payload. Other providers such as Slack, GitHub Actions, Kubernetes and ERP connectors are still planned.
+
+Notifications, recovery checks and rollback actions that do not select a real provider are still recorded as audit records and `NotificationDelivery` rows.
 
 ## Safety model
 
