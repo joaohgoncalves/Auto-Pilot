@@ -11,10 +11,14 @@ export const signalQueue = new Queue('signal-processing', {
   }
 });
 
+export function signalJobId(signalId: string) {
+  return `signal-${signalId}`;
+}
+
 export async function enqueueSignal(signalId: string) {
   await signalQueue.add(
     'process-signal',
     { signalId },
-    { jobId: `signal:${signalId}` }
+    { jobId: signalJobId(signalId) }
   );
 }

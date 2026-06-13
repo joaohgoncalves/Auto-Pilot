@@ -1,7 +1,7 @@
 import { OutboxEventStatus, SignalStatus, type Prisma } from '@prisma/client';
 import { env } from '../config/env.js';
-import { actionQueue } from '../queues/action.queue.js';
-import { signalQueue } from '../queues/signal.queue.js';
+import { actionJobId, actionQueue } from '../queues/action.queue.js';
+import { signalJobId, signalQueue } from '../queues/signal.queue.js';
 import { prisma } from '../lib/prisma.js';
 import { createDeadLetterEvent, OUTBOX_TYPES } from '../lib/outbox.js';
 import { auditWithTx } from '../lib/audit.js';
@@ -22,7 +22,7 @@ async function dispatchEvent(event: { id: string; type: string; payload: unknown
   if (event.type === OUTBOX_TYPES.PROCESS_SIGNAL) {
     const signalId = String(payload.signalId ?? '');
     if (!signalId) throw new Error('Outbox signal.process event is missing payload.signalId');
-    await signalQueue.add('process-signal', { signalId }, { jobId: `signal:${signalId}` });
+    await signalQueue.add('process-signal', { signalId }, { jobId: signalJobId(signalId) });
     await prisma.signal.updateMany({ where: { id: signalId, status: SignalStatus.RECEIVED }, data: { status: SignalStatus.QUEUED } });
     return;
   }
@@ -31,7 +31,7 @@ async function dispatchEvent(event: { id: string; type: string; payload: unknown
     const actionId = String(payload.actionId ?? '');
     const reason = String(payload.reason ?? 'execute');
     if (!actionId) throw new Error('Outbox action.execute event is missing payload.actionId');
-    await actionQueue.add('execute-action', { actionId, reason }, { jobId: `action:${actionId}:${reason}` });
+    await actionQueue.add('execute-action', { actionId, reason }, { jobId: actionJobId(actionId, reason) });
     return;
   }
 

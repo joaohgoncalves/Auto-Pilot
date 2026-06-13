@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { Role, Severity, SignalStatus, type Prisma } from '@prisma/client';
+import { Prisma, Role, Severity, SignalStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { auditWithTx } from '../lib/audit.js';
 import { createOutboxEvent, OUTBOX_TYPES } from '../lib/outbox.js';
@@ -57,50 +57,67 @@ export async function signalsRoutes(app: FastifyInstance) {
       }
     }
 
-    const signal = await prisma.$transaction(async (tx) => {
-      const created = await tx.signal.create({
-        data: {
+    try {
+      const signal = await prisma.$transaction(async (tx) => {
+        const created = await tx.signal.create({
+          data: {
+            tenantId,
+            idempotencyKey: body.idempotencyKey,
+            source: body.source,
+            type: body.type,
+            entity: body.entity,
+            entityId: body.entityId,
+            severity: toSeverity(body.severity),
+            payload: body.data as Prisma.InputJsonValue,
+            status: SignalStatus.RECEIVED,
+            createdById: request.user.sub,
+            requestId: request.id
+          }
+        });
+
+        await auditWithTx(tx, {
           tenantId,
-          idempotencyKey: body.idempotencyKey,
-          source: body.source,
-          type: body.type,
-          entity: body.entity,
-          entityId: body.entityId,
-          severity: toSeverity(body.severity),
-          payload: body.data as Prisma.InputJsonValue,
-          status: SignalStatus.RECEIVED,
-          createdById: request.user.sub,
-          requestId: request.id
+          signalId: created.id,
+          actor: 'api',
+          actorUserId: request.user.sub,
+          event: 'signal.received',
+          message: `Signal ${body.type} received from ${body.source}.`,
+          resourceType: 'signal',
+          resourceId: created.id,
+          requestId: request.id,
+          correlationId: created.correlationId,
+          metadata: { entity: body.entity, entityId: body.entityId }
+        });
+
+        await createOutboxEvent(tx, {
+          tenantId,
+          type: OUTBOX_TYPES.PROCESS_SIGNAL,
+          payload: { signalId: created.id },
+          dedupeKey: `signal.process:${created.id}`,
+          requestId: request.id,
+          correlationId: created.correlationId
+        });
+
+        return created;
+      });
+
+      return reply.status(202).send(ok({ signalId: signal.id, status: 'received', correlationId: signal.correlationId }));
+    } catch (error) {
+      if (body.idempotencyKey && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const existing = await prisma.signal.findUnique({
+          where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: body.idempotencyKey } }
+        });
+        if (existing) {
+          return reply.status(202).send(ok({
+            signalId: existing.id,
+            status: existing.status,
+            correlationId: existing.correlationId,
+            idempotentReplay: true
+          }));
         }
-      });
-
-      await auditWithTx(tx, {
-        tenantId,
-        signalId: created.id,
-        actor: 'api',
-        actorUserId: request.user.sub,
-        event: 'signal.received',
-        message: `Signal ${body.type} received from ${body.source}.`,
-        resourceType: 'signal',
-        resourceId: created.id,
-        requestId: request.id,
-        correlationId: created.correlationId,
-        metadata: { entity: body.entity, entityId: body.entityId }
-      });
-
-      await createOutboxEvent(tx, {
-        tenantId,
-        type: OUTBOX_TYPES.PROCESS_SIGNAL,
-        payload: { signalId: created.id },
-        dedupeKey: `signal.process:${created.id}`,
-        requestId: request.id,
-        correlationId: created.correlationId
-      });
-
-      return created;
-    });
-
-    return reply.status(202).send(ok({ signalId: signal.id, status: 'received', correlationId: signal.correlationId }));
+      }
+      throw error;
+    }
   });
 
   app.get('/signals', { preHandler: [app.requireRole(Role.VIEWER)] }, async (request) => {

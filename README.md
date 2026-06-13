@@ -1,5 +1,7 @@
 # AutoPilotOps / Self-Healing Platform
 
+[![CI](https://github.com/joaohgoncalves/Auto-Pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/joaohgoncalves/Auto-Pilot/actions/workflows/ci.yml)
+
 AutoPilotOps is a multi-tenant self-healing operations platform. It ingests operational signals, correlates incidents, evaluates configurable rules and policies, creates actions, gates risky actions behind human approval, executes safe actions asynchronously and records an audit trail.
 
 ```txt
@@ -105,6 +107,14 @@ RUN_INTEGRATION_TESTS=true npm --workspace apps/api test
 
 ## Docker
 
+Development dependencies only:
+
+```bash
+docker compose -f infra/docker-compose.dev.yml up -d
+```
+
+Full local stack:
+
 ```bash
 cp .env.example .env
 docker compose up --build
@@ -117,6 +127,12 @@ The compose stack starts:
 - API
 - Worker with outbox dispatcher, signal worker and action worker
 - Web
+
+Production compose is separated from development and keeps Postgres/Redis off public ports:
+
+```bash
+docker compose -f infra/docker-compose.prod.yml --env-file .env.production up --build -d
+```
 
 ## Important simulation note
 

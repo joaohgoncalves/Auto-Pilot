@@ -12,10 +12,14 @@ export const actionQueue = new Queue('action-execution', {
   }
 });
 
+export function actionJobId(actionId: string, reason = 'execute') {
+  return `action-${actionId}-${reason.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+}
+
 export async function enqueueActionExecution(actionId: string, reason = 'execute') {
   await actionQueue.add(
     'execute-action',
     { actionId, reason },
-    { jobId: `action:${actionId}:${reason}` }
+    { jobId: actionJobId(actionId, reason) }
   );
 }
