@@ -1,0 +1,9 @@
+process.env.NODE_ENV ??= 'test';
+process.env.DATABASE_URL ??= 'postgresql://autopilotops:autopilotops@localhost:5432/autopilotops?schema=public';
+process.env.REDIS_URL ??= 'redis://localhost:6379';
+process.env.JWT_SECRET ??= 'test-secret-test-secret-test-secret-32';
+process.env.CORS_ORIGINS ??= 'http://localhost:3000';
+process.env.JWT_ACCESS_TOKEN_TTL ??= '15m';
+process.env.ACTION_LOCK_TTL_SECONDS ??= '60';
+process.env.OUTBOX_DISPATCH_INTERVAL_MS ??= '1000';
+process.env.OUTBOX_DISPATCH_BATCH_SIZE ??= '10';
