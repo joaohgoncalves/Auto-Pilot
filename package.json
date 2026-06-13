@@ -1,0 +1,37 @@
+{
+  "name": "autopilotops-self-healing-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Self-healing operations platform for technical and business workflows.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace apps/api run dev",
+    "dev:worker": "npm --workspace apps/api run dev:worker",
+    "dev:web": "npm --workspace apps/web run dev",
+    "build": "npm --workspace packages/shared run build && npm --workspace apps/api run build && npm --workspace apps/web run build",
+    "test": "npm --workspaces run test --if-present",
+    "lint": "npm --workspace packages/shared run lint && npm --workspace apps/api run lint && npm --workspace apps/web run lint",
+    "typecheck": "npm --workspace packages/shared run typecheck && npm --workspace apps/api run typecheck && npm --workspace apps/web run typecheck",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "test:integration": "npm --workspace apps/api run test:integration",
+    "test:integration:ci": "docker compose up -d postgres redis && npm run db:generate && npm run db:migrate:deploy && RUN_INTEGRATION_TESTS=true npm --workspace apps/api run test:integration",
+    "db:reset": "prisma migrate reset --force",
+    "dev:full": "npm run docker:up && npm run dev:api",
+    "docker:up": "docker compose up -d postgres redis",
+    "docker:down": "docker compose down",
+    "lint:fix": "npm --workspaces run lint --if-present"
+  },
+  "devDependencies": {
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
