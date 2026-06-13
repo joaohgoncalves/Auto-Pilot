@@ -1,4 +1,4 @@
-import { ActionStatus } from '@prisma/client';
+import { ActionStatus, type Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { auditWithTx } from '../lib/audit.js';
 import { createDeadLetterEvent } from '../lib/outbox.js';
@@ -10,7 +10,7 @@ export interface MoveActionToDeadLetterInput {
   reason: string;
   lastError: string;
   errorCode?: string;
-  requestId?: string;
+  requestId?: string | null;
   attemptId?: string;
 }
 
@@ -49,7 +49,7 @@ export class ActionDeadLetterService {
         signalId: input.action.signalId,
         reason: input.reason,
         attempts: input.action.attemptCount,
-        payload: asRecord(input.action.payload),
+        payload: asRecord(input.action.payload) as Prisma.InputJsonValue,
         queueName: 'action-execution',
         jobName: 'execute-action',
         errorCode: input.errorCode ?? 'ACTION_DEAD_LETTER',

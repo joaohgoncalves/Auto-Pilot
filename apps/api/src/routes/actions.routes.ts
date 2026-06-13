@@ -10,6 +10,12 @@ import { createOutboxEvent, OUTBOX_TYPES } from '../lib/outbox.js';
 import { env } from '../config/env.js';
 import { ok, paginated } from '../lib/response.js';
 
+const RETRYABLE_ACTION_STATUSES: readonly ActionStatus[] = [
+  ActionStatus.FAILED,
+  ActionStatus.PENDING,
+  ActionStatus.DEAD_LETTER
+];
+
 const listActionsQuerySchema = z.object({
   page: z.coerce.number().optional(),
   limit: z.coerce.number().optional(),
@@ -61,7 +67,7 @@ export async function actionsRoutes(app: FastifyInstance) {
     const body = decisionSchema.parse(request.body ?? {});
     const action = await prisma.action.findFirst({ where: { id, tenantId: request.user.tenantId } });
     if (!action) throw notFound('Action not found.');
-    if (![ActionStatus.FAILED, ActionStatus.PENDING, ActionStatus.DEAD_LETTER].includes(action.status)) {
+    if (!RETRYABLE_ACTION_STATUSES.includes(action.status)) {
       throw conflict(`Action cannot be retried from status ${action.status}.`);
     }
 

@@ -1,6 +1,6 @@
 import { OutboxEventStatus, type Prisma } from '@prisma/client';
 
-type JsonObject = Record<string, unknown>;
+type JsonPayload = Prisma.InputJsonValue;
 
 export const OUTBOX_TYPES = {
   PROCESS_SIGNAL: 'signal.process',
@@ -10,7 +10,7 @@ export const OUTBOX_TYPES = {
 export async function createOutboxEvent(tx: Prisma.TransactionClient, input: {
   tenantId: string;
   type: string;
-  payload: JsonObject;
+  payload: JsonPayload;
   dedupeKey: string;
   requestId?: string | null;
   correlationId?: string | null;
@@ -32,7 +32,7 @@ export async function createOutboxEvent(tx: Prisma.TransactionClient, input: {
     create: {
       tenantId: input.tenantId,
       type: input.type,
-      payload: input.payload,
+      payload: input.payload as Prisma.InputJsonValue,
       dedupeKey: input.dedupeKey,
       status: OutboxEventStatus.PENDING,
       availableAt: input.availableAt ?? new Date(),
@@ -49,7 +49,7 @@ export async function createDeadLetterEvent(tx: Prisma.TransactionClient, input:
   sourceId: string;
   reason: string;
   attempts: number;
-  payload: JsonObject;
+  payload: JsonPayload;
   actionId?: string | null;
   signalId?: string | null;
   outboxEventId?: string | null;
@@ -69,7 +69,7 @@ export async function createDeadLetterEvent(tx: Prisma.TransactionClient, input:
     update: {
       reason: input.reason,
       attempts: input.attempts,
-      payload: input.payload,
+      payload: input.payload as Prisma.InputJsonValue,
       actionId: input.actionId ?? undefined,
       signalId: input.signalId ?? undefined,
       outboxEventId: input.outboxEventId ?? undefined,
@@ -85,7 +85,7 @@ export async function createDeadLetterEvent(tx: Prisma.TransactionClient, input:
       sourceId: input.sourceId,
       reason: input.reason,
       attempts: input.attempts,
-      payload: input.payload,
+      payload: input.payload as Prisma.InputJsonValue,
       actionId: input.actionId ?? undefined,
       signalId: input.signalId ?? undefined,
       outboxEventId: input.outboxEventId ?? undefined,

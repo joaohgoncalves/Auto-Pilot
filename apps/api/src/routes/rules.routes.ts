@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { toPagination } from '../lib/pagination.js';
 import { audit } from '../lib/audit.js';
@@ -50,8 +50,8 @@ export async function rulesRoutes(app: FastifyInstance) {
         name: body.name,
         description: body.description,
         triggerType: body.triggerType,
-        conditions: body.conditions,
-        actions: body.actions,
+        conditions: body.conditions as Prisma.InputJsonValue,
+        actions: body.actions as Prisma.InputJsonValue,
         priority: body.priority,
         isActive: body.isActive,
         createdById: request.user.sub,
@@ -82,7 +82,14 @@ export async function rulesRoutes(app: FastifyInstance) {
     const current = await prisma.rule.findFirst({ where: { id, tenantId: request.user.tenantId } });
     if (!current) throw notFound('Rule not found.');
 
-    const rule = await prisma.rule.update({ where: { id }, data: { ...body, updatedById: request.user.sub } });
+    const { conditions, actions, ...rest } = body;
+    const data: Prisma.RuleUncheckedUpdateInput = {
+      ...rest,
+      ...(conditions ? { conditions: conditions as Prisma.InputJsonValue } : {}),
+      ...(actions ? { actions: actions as Prisma.InputJsonValue } : {}),
+      updatedById: request.user.sub
+    };
+    const rule = await prisma.rule.update({ where: { id }, data });
     await ruleEngineService.invalidateRules(request.user.tenantId, current.triggerType);
     if (rule.triggerType !== current.triggerType) await ruleEngineService.invalidateRules(request.user.tenantId, rule.triggerType);
     await audit({

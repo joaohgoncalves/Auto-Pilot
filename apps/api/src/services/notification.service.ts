@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 
 export interface SimulatedNotificationInput {
@@ -10,15 +11,16 @@ export interface SimulatedNotificationInput {
 
 export class NotificationService {
   async simulateDelivery(input: SimulatedNotificationInput) {
+    const recipient = input.recipient ?? '';
     return prisma.notificationDelivery.upsert({
-      where: { actionId_channel_recipient: { actionId: input.actionId, channel: input.channel, recipient: input.recipient ?? null } },
+      where: { actionId_channel_recipient: { actionId: input.actionId, channel: input.channel, recipient } },
       update: {},
       create: {
         tenantId: input.tenantId,
         actionId: input.actionId,
         channel: input.channel,
-        recipient: input.recipient ?? null,
-        payload: input.payload
+        recipient,
+        payload: input.payload as Prisma.InputJsonValue
       }
     });
   }

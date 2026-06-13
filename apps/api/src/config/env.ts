@@ -1,5 +1,8 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
+
+loadEnv();
+loadEnv({ path: '../../.env' });
 
 const nodeEnv = z.enum(['development', 'test', 'production']).default('development');
 const secretSchema = z.string().min(32, 'Secret must have at least 32 characters');

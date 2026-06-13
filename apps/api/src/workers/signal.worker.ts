@@ -155,7 +155,7 @@ export function startSignalWorker() {
                 requiresApproval: policy.mode === 'REQUIRE_APPROVAL',
                 approvalReason: policy.reason,
                 dedupeKey,
-                payload: plannedAction.payload,
+                payload: plannedAction.payload as Prisma.InputJsonValue,
                 maxAttempts: env.ACTION_MAX_ATTEMPTS,
                 createdById: current.createdById,
                 requestId: current.requestId,

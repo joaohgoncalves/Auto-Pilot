@@ -21,7 +21,7 @@ export class ActionExecutionService {
       const current = await prisma.action.findUnique({ where: { id: actionId } });
       if (!current) return { skipped: true, reason: 'Action not found.' };
       if (current.status === ActionStatus.WAITING_APPROVAL || current.requiresApproval) {
-        await this.approvalService.ensureApprovalRequest({ action: current, requestId: options.requestId, reason: current.approvalReason });
+        await this.approvalService.ensureApprovalRequest({ action: current, requestId: options.requestId, reason: current.approvalReason ?? undefined });
         return { skipped: true, reason: 'Action requires approval.' };
       }
       return { skipped: true, reason: `Action is ${current.status}.` };

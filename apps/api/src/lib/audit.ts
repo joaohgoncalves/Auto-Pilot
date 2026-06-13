@@ -10,7 +10,7 @@ export interface AuditInput {
   message: string;
   resourceType?: string;
   resourceId?: string;
-  requestId?: string;
+  requestId?: string | null;
   correlationId?: string | null;
   metadata?: Record<string, unknown>;
 }
@@ -25,9 +25,9 @@ function toAuditCreate(input: AuditInput): Prisma.AuditLogUncheckedCreateInput {
     message: input.message,
     resourceType: input.resourceType,
     resourceId: input.resourceId,
-    requestId: input.requestId,
+    requestId: input.requestId ?? undefined,
     correlationId: input.correlationId ?? undefined,
-    metadata: input.metadata ?? {}
+    metadata: (input.metadata ?? {}) as Prisma.InputJsonValue
   };
 }
 

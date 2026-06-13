@@ -12,6 +12,6 @@ export interface ActionExecutionResult {
 
 export interface ActionWorkerOptions {
   actor?: string;
-  requestId?: string;
+  requestId?: string | null;
   workerId?: string;
 }

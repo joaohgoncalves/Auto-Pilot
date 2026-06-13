@@ -5,9 +5,17 @@ import { prisma } from '../lib/prisma.js';
 import { moveActionToDeadLetter } from './action-dead-letter.service.js';
 import type { ActionWithSignal } from './action.types.js';
 
+const TERMINAL_ACTION_STATUSES: readonly ActionStatus[] = [
+  ActionStatus.EXECUTED,
+  ActionStatus.SKIPPED,
+  ActionStatus.CANCELED,
+  ActionStatus.REJECTED,
+  ActionStatus.DEAD_LETTER
+];
+
 export interface ClaimActionOptions {
   workerId?: string;
-  requestId?: string;
+  requestId?: string | null;
 }
 
 export class ActionClaimService {
@@ -17,7 +25,7 @@ export class ActionClaimService {
     if (!current) return null;
 
     if (current.requiresApproval || current.status === ActionStatus.WAITING_APPROVAL) return null;
-    if ([ActionStatus.EXECUTED, ActionStatus.SKIPPED, ActionStatus.CANCELED, ActionStatus.REJECTED, ActionStatus.DEAD_LETTER].includes(current.status)) return null;
+    if (TERMINAL_ACTION_STATUSES.includes(current.status)) return null;
 
     if (current.attemptCount >= current.maxAttempts) {
       await moveActionToDeadLetter({

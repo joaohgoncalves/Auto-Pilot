@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { Role, Severity, SignalStatus } from '@prisma/client';
+import { Role, Severity, SignalStatus, type Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { auditWithTx } from '../lib/audit.js';
 import { createOutboxEvent, OUTBOX_TYPES } from '../lib/outbox.js';
@@ -67,7 +67,7 @@ export async function signalsRoutes(app: FastifyInstance) {
           entity: body.entity,
           entityId: body.entityId,
           severity: toSeverity(body.severity),
-          payload: body.data,
+          payload: body.data as Prisma.InputJsonValue,
           status: SignalStatus.RECEIVED,
           createdById: request.user.sub,
           requestId: request.id

@@ -1,4 +1,4 @@
-import { OutboxEventStatus, SignalStatus } from '@prisma/client';
+import { OutboxEventStatus, SignalStatus, type Prisma } from '@prisma/client';
 import { env } from '../config/env.js';
 import { actionQueue } from '../queues/action.queue.js';
 import { signalQueue } from '../queues/signal.queue.js';
@@ -101,7 +101,7 @@ export async function dispatchOutboxBatch(batchSize = DEFAULT_BATCH_SIZE) {
             outboxEventId: event.id,
             reason: `Outbox dispatch failed after ${attemptsAfterClaim} attempts.`,
             attempts: attemptsAfterClaim,
-            payload: asRecord(event.payload),
+            payload: asRecord(event.payload) as Prisma.InputJsonValue,
             queueName: event.type.startsWith('action.') ? 'action-execution' : 'signal-processing',
             jobName: event.type,
             lastError: message,
