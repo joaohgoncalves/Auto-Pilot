@@ -1,0 +1,487 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  OPERATOR
+  VIEWER
+}
+
+enum SignalStatus {
+  RECEIVED
+  QUEUED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum Severity {
+  INFO
+  WARNING
+  HIGH
+  CRITICAL
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ActionStatus {
+  PENDING
+  RUNNING
+  WAITING_APPROVAL
+  EXECUTED
+  FAILED
+  DEAD_LETTER
+  SKIPPED
+  REJECTED
+  CANCELED
+}
+
+enum ActionAttemptStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  MITIGATING
+  RESOLVED
+  CANCELED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELED
+}
+
+enum RecommendationStatus {
+  OPEN
+  ACCEPTED
+  DISMISSED
+  COMPLETED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum OutboxEventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  DEAD_LETTER
+}
+
+model Tenant {
+  id                     String                   @id @default(cuid())
+  name                   String
+  slug                   String                   @unique
+  autoExecuteMediumRisk  Boolean                  @default(false)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  users                  Membership[]
+  sessions               RefreshSession[]
+  signals                Signal[]
+  rules                  Rule[]
+  ruleExecutions         RuleExecution[]
+  actions                Action[]
+  actionAttempts         ActionAttempt[]
+  incidents              Incident[]
+  recommendations        PurchaseRecommendation[]
+  tasks                  OperationalTask[]
+  approvals              ApprovalRequest[]
+  audits                 AuditLog[]
+  notificationDeliveries NotificationDelivery[]
+  outboxEvents           OutboxEvent[]
+  deadLetters            DeadLetterEvent[]
+}
+
+model User {
+  id             String           @id @default(cuid())
+  name           String
+  email          String           @unique
+  passwordHash   String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  memberships    Membership[]
+  sessions       RefreshSession[]
+  createdSignals Signal[]         @relation("SignalCreatedBy")
+  createdActions Action[]         @relation("ActionCreatedBy")
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      Role
+  isActive  Boolean  @default(true)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, tenantId])
+  @@index([tenantId, role])
+  @@index([tenantId, isActive, role])
+}
+
+model RefreshSession {
+  id                  String    @id @default(cuid())
+  userId              String
+  tenantId            String
+  tokenHash           String    @unique
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  revokedReason       String?
+  replacedBySessionId String?
+  ipAddress           String?
+  userAgent           String?
+  createdAt           DateTime  @default(now())
+  lastUsedAt          DateTime?
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, tenantId])
+  @@index([expiresAt])
+}
+
+model Signal {
+  id             String            @id @default(cuid())
+  tenantId       String
+  idempotencyKey String?
+  source         String
+  type           String
+  entity         String
+  entityId       String
+  severity       Severity
+  payload        Json
+  diagnosis      String?
+  riskLevel      RiskLevel?
+  status         SignalStatus      @default(RECEIVED)
+  receivedAt     DateTime          @default(now())
+  processedAt    DateTime?
+  failedAt       DateTime?
+  failureReason  String?
+  createdById    String?
+  requestId      String?
+  correlationId  String            @default(cuid())
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy      User?             @relation("SignalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  actions        Action[]
+  ruleExecutions RuleExecution[]
+  audits         AuditLog[]
+  deadLetters    DeadLetterEvent[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, type])
+  @@index([tenantId, status])
+  @@index([tenantId, severity])
+  @@index([tenantId, receivedAt])
+  @@index([tenantId, correlationId])
+}
+
+model Rule {
+  id             String          @id @default(cuid())
+  tenantId       String
+  name           String
+  description    String?
+  triggerType    String
+  conditions     Json
+  actions        Json
+  priority       Int             @default(100)
+  isActive       Boolean         @default(true)
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actionsCreated Action[]
+  executions     RuleExecution[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, triggerType, isActive, priority])
+}
+
+model RuleExecution {
+  id        String   @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  signalId  String
+  matched   Boolean
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rule      Rule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  signal    Signal   @relation(fields: [signalId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, ruleId, signalId])
+  @@index([tenantId, signalId])
+}
+
+model Action {
+  id                     String                   @id @default(cuid())
+  tenantId               String
+  signalId               String?
+  ruleId                 String?
+  type                   String
+  title                  String
+  riskLevel              RiskLevel
+  status                 ActionStatus             @default(PENDING)
+  requiresApproval       Boolean                  @default(false)
+  approvalReason         String?
+  dedupeKey              String
+  payload                Json
+  errorMessage           String?
+  errorCode              String?
+  lastError              String?
+  attemptCount           Int                      @default(0)
+  maxAttempts            Int                      @default(3)
+  lockedAt               DateTime?
+  lockedBy               String?
+  heartbeatAt            DateTime?
+  lockExpiresAt          DateTime?
+  executedAt             DateTime?
+  failedAt               DateTime?
+  deadLetteredAt         DateTime?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  createdById            String?
+  requestId              String?
+  correlationId          String?
+  tenant                 Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  signal                 Signal?                  @relation(fields: [signalId], references: [id], onDelete: SetNull)
+  rule                   Rule?                    @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  createdBy              User?                    @relation("ActionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  approval               ApprovalRequest?
+  attempts               ActionAttempt[]
+  incident               Incident?
+  recommendation         PurchaseRecommendation?
+  task                   OperationalTask?
+  notificationDeliveries NotificationDelivery[]
+  deadLetters            DeadLetterEvent[]
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, signalId])
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@index([tenantId, riskLevel])
+  @@index([tenantId, status, lockExpiresAt])
+}
+
+model ActionAttempt {
+  id           String              @id @default(cuid())
+  tenantId     String
+  actionId     String
+  attemptNo    Int
+  status       ActionAttemptStatus @default(RUNNING)
+  startedAt    DateTime            @default(now())
+  finishedAt   DateTime?
+  errorCode    String?
+  errorMessage String?
+  workerId     String?
+  requestId    String?
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action       Action              @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@unique([actionId, attemptNo])
+  @@index([tenantId, actionId])
+  @@index([tenantId, status])
+}
+
+model ApprovalRequest {
+  id                  String         @id @default(cuid())
+  tenantId            String
+  actionId            String         @unique
+  title               String
+  reason              String
+  status              ApprovalStatus @default(PENDING)
+  minApproverRole     Role           @default(MANAGER)
+  selfApprovalAllowed Boolean        @default(false)
+  requestedById       String?
+  requestedAt         DateTime       @default(now())
+  expiresAt           DateTime?
+  decidedAt           DateTime?
+  decidedById         String?
+  decisionReason      String?
+  tenant              Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action              Action         @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, expiresAt])
+}
+
+model Incident {
+  id             String         @id @default(cuid())
+  tenantId       String
+  signalId       String?
+  actionId       String?        @unique
+  title          String
+  serviceName    String?
+  severity       Severity
+  status         IncidentStatus @default(OPEN)
+  probableCause  String?
+  recommendedFix String?
+  startedAt      DateTime       @default(now())
+  resolvedAt     DateTime?
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action         Action?        @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, severity])
+}
+
+model PurchaseRecommendation {
+  id                   String               @id @default(cuid())
+  tenantId             String
+  signalId             String?
+  actionId             String?              @unique
+  productSku           String
+  productName          String
+  currentStock         Int
+  dailySalesAverage    Float
+  supplierLeadTimeDays Int
+  suggestedQuantity    Int
+  riskLevel            RiskLevel
+  supplierName         String?
+  status               RecommendationStatus @default(OPEN)
+  createdAt            DateTime             @default(now())
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action               Action?              @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, productSku])
+}
+
+model OperationalTask {
+  id          String     @id @default(cuid())
+  tenantId    String
+  signalId    String?
+  actionId    String?    @unique
+  title       String
+  description String
+  assignee    String?
+  dueAt       DateTime?
+  status      TaskStatus  @default(OPEN)
+  createdAt   DateTime    @default(now())
+  completedAt DateTime?
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action      Action?     @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, dueAt])
+}
+
+model NotificationDelivery {
+  id          String   @id @default(cuid())
+  tenantId    String
+  actionId    String
+  channel     String
+  recipient   String?
+  status      String   @default("SIMULATED")
+  payload     Json
+  deliveredAt DateTime @default(now())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action      Action   @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@unique([actionId, channel, recipient])
+  @@index([tenantId, status])
+}
+
+model OutboxEvent {
+  id            String            @id @default(cuid())
+  tenantId      String
+  type          String
+  payload       Json
+  status        OutboxEventStatus @default(PENDING)
+  attempts      Int               @default(0)
+  maxAttempts   Int               @default(5)
+  lastError     String?
+  availableAt   DateTime          @default(now())
+  processedAt   DateTime?
+  processingStartedAt DateTime?
+  claimedBy     String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  requestId     String?
+  correlationId String?
+  dedupeKey     String?
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type, dedupeKey])
+  @@index([tenantId, status, availableAt])
+  @@index([status, availableAt, createdAt])
+  @@index([status, processingStartedAt])
+  @@index([tenantId, type, createdAt])
+}
+
+model DeadLetterEvent {
+  id            String   @id @default(cuid())
+  tenantId      String
+  sourceType    String
+  sourceId      String?
+  actionId      String?
+  signalId      String?
+  outboxEventId String?
+  queueName     String?
+  jobName       String?
+  reason        String
+  attempts      Int
+  payload       Json
+  errorCode     String?
+  lastError     String?
+  status        String   @default("OPEN")
+  reprocessedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action        Action?  @relation(fields: [actionId], references: [id], onDelete: SetNull)
+  signal        Signal?  @relation(fields: [signalId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, sourceType, sourceId])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, actionId])
+  @@index([tenantId, signalId])
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  signalId      String?
+  actor         String
+  actorUserId   String?
+  event         String
+  message       String
+  resourceType  String?
+  resourceId    String?
+  requestId     String?
+  correlationId String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  signal        Signal?  @relation(fields: [signalId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, event])
+  @@index([tenantId, requestId])
+  @@index([tenantId, correlationId])
+}
