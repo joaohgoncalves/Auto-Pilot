@@ -66,5 +66,19 @@ const envSchema = z.object({
 
 export const env = envSchema.parse(process.env);
 export const corsOrigins = env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
+export function isAllowedCorsOrigin(origin: string) {
+  if (corsOrigins.includes(origin)) return true;
+  if (isProduction) return false;
+
+  try {
+    const url = new URL(origin);
+    if ((url.hostname === 'localhost' || url.hostname === '127.0.0.1') && ['http:', 'https:'].includes(url.protocol)) return true;
+    if (url.protocol === 'https:' && url.hostname.endsWith('.app.github.dev')) return true;
+  } catch {
+    return false;
+  }
+
+  return false;
+}
 export const jwtSecrets = [env.JWT_SECRET, ...env.JWT_PREVIOUS_SECRETS.split(',').map((secret) => secret.trim()).filter(Boolean)];
 export const isProduction = env.NODE_ENV === 'production';

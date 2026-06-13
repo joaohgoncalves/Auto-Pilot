@@ -1,6 +1,37 @@
 import type { ApiSuccess, PaginatedResult, Role } from '@autopilotops/shared';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4040';
+function inferApiUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window === 'undefined') return 'http://localhost:4040';
+
+  const { protocol, hostname, port } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return `${protocol}//${hostname}:4040`;
+  if (hostname.endsWith('.app.github.dev')) return `${protocol}//${hostname.replace(/-3000(\.|-)/, '-4040$1')}`;
+  if (port === '3000') return `${protocol}//${hostname}:4040`;
+  return `${protocol}//${hostname}`;
+}
+
+function readCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  return document.cookie
+    .split('; ')
+    .map((item) => item.split('='))
+    .find(([key]) => key === name)?.slice(1).join('=') ?? null;
+}
+
+function csrfHeaders(method?: string) {
+  const normalized = method?.toUpperCase() ?? 'GET';
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalized)) return {};
+  const token = readCookie('csrfToken');
+  return token ? { 'x-csrf-token': decodeURIComponent(token) } : {};
+}
+
+function buildHeaders(options: RequestInit = {}) {
+  const headers = new Headers(options.headers);
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  for (const [key, value] of Object.entries(csrfHeaders(options.method))) headers.set(key, value);
+  return headers;
+}
 
 export type Summary = {
   signals: number;
@@ -132,20 +163,17 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 async function request(path: string, options: RequestInit = {}, retryOnUnauthorized = true) {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${inferApiUrl()}${path}`, {
     ...options,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {})
-    }
+    headers: buildHeaders(options)
   });
 
   if (response.status === 401 && retryOnUnauthorized && !path.startsWith('/auth/')) {
-    const refreshed = await fetch(`${API_URL}/auth/refresh`, {
+    const refreshed = await fetch(`${inferApiUrl()}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders({ method: 'POST' }),
       body: '{}'
     });
 
@@ -165,10 +193,10 @@ export function saveAuth(_data: AuthResponse) {
 }
 
 export async function clearAuth() {
-  await fetch(`${API_URL}/auth/logout`, {
+  await fetch(`${inferApiUrl()}/auth/logout`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders({ method: 'POST' }),
     body: '{}'
   }).catch(() => undefined);
 }

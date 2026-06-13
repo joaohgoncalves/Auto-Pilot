@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { corsOrigins, isProduction } from '../config/env.js';
+import { isAllowedCorsOrigin, isProduction } from '../config/env.js';
 import { forbidden } from './errors.js';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -53,6 +53,6 @@ export function validateCsrfForCookieAuth(request: FastifyRequest) {
 
   const origin = parseOrigin(request.headers.origin?.toString()) ?? parseOrigin(request.headers.referer?.toString());
   if (!origin) throw forbidden('CSRF validation failed: missing Origin/Referer header for mutating cookie-auth request.');
-  if (!corsOrigins.includes(origin)) throw forbidden('CSRF validation failed: Origin/Referer is not allowed.');
+  if (!isAllowedCorsOrigin(origin)) throw forbidden('CSRF validation failed: Origin/Referer is not allowed.');
   if (hasCookieAuth) validateDoubleSubmit(request);
 }

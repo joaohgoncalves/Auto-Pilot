@@ -7,7 +7,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import rateLimit from '@fastify/rate-limit';
 import helmet from '@fastify/helmet';
-import { env, corsOrigins, isProduction } from './config/env.js';
+import { env, isAllowedCorsOrigin, isProduction } from './config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { healthRoutes } from './routes/health.routes.js';
 import { signalsRoutes } from './routes/signals.routes.js';
@@ -36,7 +36,7 @@ export function buildApp() {
   app.register(cors, {
     origin(origin, callback) {
       if (!origin) return callback(null, true);
-      if (corsOrigins.includes(origin)) return callback(null, true);
+      if (isAllowedCorsOrigin(origin)) return callback(null, true);
       return callback(new Error('CORS origin not allowed'), false);
     },
     credentials: true
