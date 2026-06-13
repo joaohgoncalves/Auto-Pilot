@@ -32,7 +32,10 @@ const envSchema = z.object({
   ACTION_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
   ACTION_LOCK_TTL_SECONDS: z.coerce.number().int().min(10).max(3600).default(120),
   OUTBOX_DISPATCH_INTERVAL_MS: z.coerce.number().int().min(250).max(60000).default(1000),
-  OUTBOX_DISPATCH_BATCH_SIZE: z.coerce.number().int().min(1).max(200).default(25)
+  OUTBOX_DISPATCH_BATCH_SIZE: z.coerce.number().int().min(1).max(200).default(25),
+  WEBHOOK_PROVIDER_URL: z.string().url().optional(),
+  WEBHOOK_PROVIDER_TIMEOUT_MS: z.coerce.number().int().min(500).max(30000).default(10000),
+  WEBHOOK_PROVIDER_TOKEN: z.string().optional()
 }).transform((value) => ({
   ...value,
   CORS_ORIGINS: value.CORS_ORIGINS ?? value.CORS_ORIGIN ?? 'http://localhost:3000',

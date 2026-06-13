@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { asRecord, toNumber } from '../lib/utils.js';
 import type { ActionWithSignal, ActionWorkerOptions } from './action.types.js';
 import { notificationService } from './notification.service.js';
+import { resolveActionProvider } from '../providers/action-provider.registry.js';
 
 export class UnknownActionTypeError extends Error {
   constructor(actionType: string) {
@@ -33,6 +34,30 @@ export class ActionSideEffectsService {
   async execute(action: ActionWithSignal, options: ActionWorkerOptions = {}) {
     const payload = asRecord(action.payload);
     const signal = action.signal;
+    const provider = resolveActionProvider(action);
+
+    if (provider) {
+      const result = await provider.execute({ action, signal, ...options });
+      await audit({
+        tenantId: action.tenantId,
+        signalId: signal?.id,
+        actor: options.actor ?? 'action-provider',
+        event: 'action.provider_executed',
+        message: `Action ${action.id} executed by ${result.provider}.`,
+        resourceType: 'action',
+        resourceId: action.id,
+        requestId: options.requestId,
+        correlationId: action.correlationId,
+        metadata: {
+          provider: result.provider,
+          externalId: result.externalId,
+          statusCode: result.statusCode,
+          message: result.message,
+          ...result.metadata
+        }
+      });
+      return;
+    }
 
     if (action.type === 'create_incident') {
       const incident = await prisma.incident.upsert({

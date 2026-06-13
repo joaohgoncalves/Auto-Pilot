@@ -7,3 +7,4 @@ process.env.JWT_ACCESS_TOKEN_TTL ??= '15m';
 process.env.ACTION_LOCK_TTL_SECONDS ??= '60';
 process.env.OUTBOX_DISPATCH_INTERVAL_MS ??= '1000';
 process.env.OUTBOX_DISPATCH_BATCH_SIZE ??= '10';
+process.env.WEBHOOK_PROVIDER_TIMEOUT_MS ??= '1000';
