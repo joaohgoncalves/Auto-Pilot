@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { api, saveAuth, type AuthResponse } from '../lib/api';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@autopilotops.dev');
-  const [password, setPassword] = useState('Admin@123456');
-  const [tenantSlug, setTenantSlug] = useState('autopilotops-demo');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [tenantSlug, setTenantSlug] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -33,12 +33,11 @@ export default function LoginPage() {
         <span className="badge">AutoPilotOps</span>
         <h1>Self-Healing Operations</h1>
         <p className="muted">Sessão via cookies httpOnly. O frontend não grava access token em localStorage.</p>
-        <label>Email<input className="input" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-        <label>Password<input className="input" value={password} onChange={(e) => setPassword(e.target.value)} type="password" /></label>
-        <label>Tenant slug<input className="input" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} /></label>
+        <label>Email<input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></label>
+        <label>Password<input className="input" value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Your password" /></label>
+        <label>Tenant slug<input className="input" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} placeholder="your-tenant" /></label>
         {error && <p style={{ color: '#fca5a5' }}>{error}</p>}
         <button className="btn" onClick={login} disabled={loading}>{loading ? 'Entrando...' : 'Login'}</button>
-        <p className="muted">Usuários seed: admin, manager, operator e viewer em @autopilotops.dev.</p>
       </div>
     </main>
   );
